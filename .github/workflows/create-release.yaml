@@ -1,0 +1,71 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for the new release (e.g., v1.0.0)'
+        required: true
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to ensure all tags are available
+
+      - name: Get Previous Tag
+        id: previous_tag
+        shell: bash
+        run: |
+          # Get the previous tag
+          previous_tag=$(git describe --tags --abbrev=0 HEAD^ || echo "")
+          echo "Previous tag is $previous_tag"
+          echo "tag=$previous_tag" >> $GITHUB_OUTPUT
+
+      - name: Generate Changelog
+        id: changelog
+        if: steps.previous_tag.outputs.tag != ''
+        run: |
+          echo "## Changelog" > changelog.txt
+          echo "" >> changelog.txt
+          # Get the list of merged PRs since the last tag
+          git log ${{ steps.previous_tag.outputs.tag }}..HEAD --merges --pretty=format:'- %s' >> changelog.txt
+          cat changelog.txt
+
+      - name: Generate Changelog (First Release)
+        id: changelog
+        if: steps.previous_tag.outputs.tag == ''
+        run: |
+          echo "## Changelog" > changelog.txt
+          echo "" >> changelog.txt
+          # List all merged PRs
+          git log --merges --pretty=format:'- %s' >> changelog.txt
+          cat changelog.txt
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag ${{ github.event.inputs.tag_name }}
+          git push origin ${{ github.event.inputs.tag_name }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.event.inputs.tag_name }}
+          release_name: ${{ github.event.inputs.tag_name }}
+          body_path: ./changelog.txt
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
