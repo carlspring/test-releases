@@ -6,7 +6,6 @@ on:
       tag_name:
         description: 'Tag name for the new release (e.g., v1.0.0)'
         required: true
-        default: ''
 
 permissions:
   contents: write
@@ -22,40 +21,6 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history to ensure all tags are available
 
-      - name: Get Previous Tag
-        id: previous_tag
-        shell: bash
-        run: |
-          # Get all tags, sorted by creation date (newest first)
-          tags=$(git tag --sort=-creatordate)
-          echo "All tags (newest first): $tags"
-
-          # Get the previous tag (second in the list)
-          previous_tag=$(echo "$tags" | sed -n 2p)
-          echo "Previous tag: $previous_tag"
-
-          # Set the output variable
-          echo "tag=$previous_tag" >> $GITHUB_OUTPUT
-
-      - name: Generate Changelog
-        id: changelog
-        run: |
-          echo "## Changelog" > changelog.md
-          echo "" >> changelog.md
-
-          if [ "${{ steps.previous_tag.outputs.tag }}" != "" ]; then
-            echo "Generating changelog since ${{ steps.previous_tag.outputs.tag }}"
-            # Get the list of merged PRs since the last tag
-            git log ${{ steps.previous_tag.outputs.tag }}..HEAD --merges --pretty=format:'- %s' >> changelog.md
-          else
-            echo "No previous tag found. Generating changelog for all merged PRs."
-            # List all merged PRs
-            git log --merges --pretty=format:'- %s' >> changelog.md
-          fi
-
-          echo "" >> changelog.md
-          cat changelog.md
-
       - name: Create Git Tag
         run: |
           git config user.name "GitHub Actions"
@@ -64,13 +29,10 @@ jobs:
           git push origin ${{ github.event.inputs.tag_name }}
 
       - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.event.inputs.tag_name }}
-          release_name: ${{ github.event.inputs.tag_name }}
-          body_path: ./changelog.md
-          draft: false
-          prerelease: false
+          name: ${{ github.event.inputs.tag_name }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
