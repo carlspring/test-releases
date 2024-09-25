@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Tag name for the new release (e.g., v1.0.0)'
-        required: true
+        description: 'Tag name for the new release (e.g., 1.0.0, 1.0.0-rc-1)'
+        required: false
 
 permissions:
   contents: write
@@ -21,18 +21,76 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all history to ensure all tags are available
 
+      - name: Set up Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Determine Next Version
+        id: determine_version
+        run: |
+          if [ -z "${{ github.event.inputs.tag_name }}" ]; then
+            echo "No tag_name input provided. Computing next version..."
+
+            # Get the latest tag
+            latest_tag=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null)
+            echo "Latest tag: $latest_tag"
+
+            if [ -z "$latest_tag" ]; then
+              # No previous tags exist; start with initial version
+              next_version="1.0.0"
+            else
+              # Extract version components based on Maven versioning rules
+              version_pattern='^([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$'
+              if [[ "$latest_tag" =~ $version_pattern ]]; then
+                major="${BASH_REMATCH[1]}"
+                minor="${BASH_REMATCH[2]}"
+                patch="${BASH_REMATCH[3]}"
+                suffix="${BASH_REMATCH[4]}"
+
+                echo "Version components - Major: $major, Minor: $minor, Patch: $patch, Suffix: $suffix"
+
+                if [[ -n "$suffix" ]]; then
+                  # Handle pre-release versions (e.g., -rc-1, -milestone-1)
+                  suffix_pattern='^-(.+)-([0-9]+)$'
+                  if [[ "$suffix" =~ $suffix_pattern ]]; then
+                    suffix_type="${BASH_REMATCH[1]}"
+                    suffix_number="${BASH_REMATCH[2]}"
+                    next_suffix_number=$((suffix_number + 1))
+                    next_version="${major}.${minor}.${patch}-${suffix_type}-${next_suffix_number}"
+                  else
+                    # Unrecognized suffix format; increment patch version
+                    next_patch=$((patch + 1))
+                    next_version="${major}.${minor}.${next_patch}"
+                  fi
+                else
+                  # No suffix; increment patch version
+                  next_patch=$((patch + 1))
+                  next_version="${major}.${minor}.${next_patch}"
+                fi
+              else
+                echo "Latest tag does not match expected version pattern. Defaulting to 1.0.0."
+                next_version="1.0.0"
+              fi
+            fi
+          else
+            echo "Using provided tag_name input: ${{ github.event.inputs.tag_name }}"
+            next_version="${{ github.event.inputs.tag_name }}"
+          fi
+
+          echo "Next version: $next_version"
+          echo "tag_name=$next_version" >> $GITHUB_OUTPUT
+
       - name: Create Git Tag
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag ${{ github.event.inputs.tag_name }}
-          git push origin ${{ github.event.inputs.tag_name }}
+          git tag ${{ steps.determine_version.outputs.tag_name }}
+          git push origin ${{ steps.determine_version.outputs.tag_name }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.event.inputs.tag_name }}
-          name: ${{ github.event.inputs.tag_name }}
+          tag_name: ${{ steps.determine_version.outputs.tag_name }}
+          name: ${{ steps.determine_version.outputs.tag_name }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
