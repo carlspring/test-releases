@@ -126,7 +126,7 @@ jobs:
 
       - name: Build and Deploy Artifacts
         run: |
-           mvn help:effective-settings
+           mvn help:effective-settings -s ./.github/settings.xml
            mvn -s ./.github/settings.xml clean deploy -DskipTests=false
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
