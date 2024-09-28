@@ -126,7 +126,6 @@ jobs:
 
       - name: Build and Deploy Artifacts
         run: |
-#          mvn clean deploy -DskipTests=false --settings $HOME/.m2/settings.xml
           mvn clean deploy -DskipTests=false
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
