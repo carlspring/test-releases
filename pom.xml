@@ -108,13 +108,13 @@
 
     <distributionManagement>
         <repository>
-            <id>ossrh</id>
-            <name>OSSRH Release Repository</name>
+            <id>central</id>
+            <name>Maven Central Release Repository</name>
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
         <snapshotRepository>
-            <id>ossrh</id>
-            <name>OSSRH Snapshot Repository</name>
+            <id>central</id>
+            <name>Maven Central Snapshot Repository</name>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
         </snapshotRepository>
     </distributionManagement>
